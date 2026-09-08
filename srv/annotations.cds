@@ -360,81 +360,81 @@ annotate PurchaseOrderService.PurchaseOrders with {
 
 
 annotate PurchaseOrderService.PurchaseOrders with {
-    vendor @Common.ValueListWithFixedValues: true @Common.ValueList: {
-        Label: 'Vendor',
+    vendor           @Common.ValueListWithFixedValues: true  @Common.ValueList: {
+        Label         : 'Vendor',
         CollectionPath: 'Vendors',
-        Parameters: [
+        Parameters    : [
             {
-                $Type: 'Common.ValueListParameterInOut',
+                $Type            : 'Common.ValueListParameterInOut',
                 LocalDataProperty: vendor,
                 ValueListProperty: 'vendorCode'
             },
             {
-                $Type: 'Common.ValueListParameterDisplayOnly',
+                $Type            : 'Common.ValueListParameterDisplayOnly',
                 ValueListProperty: 'vendorName'
             }
         ]
     };
 
-    companyCode @Common.ValueListWithFixedValues: true @Common.ValueList: {
-        Label: 'Company Code',
+    companyCode      @Common.ValueListWithFixedValues: true  @Common.ValueList: {
+        Label         : 'Company Code',
         CollectionPath: 'CompanyCodes',
-        Parameters: [
+        Parameters    : [
             {
-                $Type: 'Common.ValueListParameterInOut',
+                $Type            : 'Common.ValueListParameterInOut',
                 LocalDataProperty: companyCode,
                 ValueListProperty: 'companyCode'
             },
             {
-                $Type: 'Common.ValueListParameterDisplayOnly',
+                $Type            : 'Common.ValueListParameterDisplayOnly',
                 ValueListProperty: 'companyName'
             }
         ]
     };
 
-    currency @Common.ValueListWithFixedValues: true @Common.ValueList: {
-        Label: 'Currency',
+    currency         @Common.ValueListWithFixedValues: true  @Common.ValueList: {
+        Label         : 'Currency',
         CollectionPath: 'Currencies',
-        Parameters: [
+        Parameters    : [
             {
-                $Type: 'Common.ValueListParameterInOut',
+                $Type            : 'Common.ValueListParameterInOut',
                 LocalDataProperty: currency,
                 ValueListProperty: 'currencyCode'
             },
             {
-                $Type: 'Common.ValueListParameterDisplayOnly',
+                $Type            : 'Common.ValueListParameterDisplayOnly',
                 ValueListProperty: 'currencyName'
             }
         ]
     };
 
-    purchasingOrg @Common.ValueListWithFixedValues: true @Common.ValueList: {
-        Label: 'Purchasing Organizations',
+    purchasingOrg    @Common.ValueListWithFixedValues: true  @Common.ValueList: {
+        Label         : 'Purchasing Organizations',
         CollectionPath: 'PurchasingOrganizations',
-        Parameters: [
+        Parameters    : [
             {
-                $Type: 'Common.ValueListParameterInOut',
+                $Type            : 'Common.ValueListParameterInOut',
                 LocalDataProperty: purchasingOrg,
                 ValueListProperty: 'purchasingOrg'
             },
             {
-                $Type: 'Common.ValueListParameterDisplayOnly',
+                $Type            : 'Common.ValueListParameterDisplayOnly',
                 ValueListProperty: 'purchasingOrgName'
             }
         ]
     };
 
-    purchasingGroup @Common.ValueListWithFixedValues: true @Common.ValueList: {
-        Label: 'Purchasing Group',
+    purchasingGroup  @Common.ValueListWithFixedValues: true  @Common.ValueList: {
+        Label         : 'Purchasing Group',
         CollectionPath: 'PurchasingGroups',
-        Parameters: [
+        Parameters    : [
             {
-                $Type: 'Common.ValueListParameterInOut',
+                $Type            : 'Common.ValueListParameterInOut',
                 LocalDataProperty: purchasingGroup,
                 ValueListProperty: 'purchasingGroup'
             },
             {
-                $Type: 'Common.ValueListParameterDisplayOnly',
+                $Type            : 'Common.ValueListParameterDisplayOnly',
                 ValueListProperty: 'purchasingGroupName'
             }
         ]
@@ -443,18 +443,18 @@ annotate PurchaseOrderService.PurchaseOrders with {
 
 
 annotate PurchaseOrderService.PurchaseOrders with @(
-    UI.HeaderInfo: {
-        TypeName: 'Purchase Order',
+    UI.HeaderInfo    : {
+        TypeName      : 'Purchase Order',
         TypeNamePlural: 'Purchase Orders',
 
-        Title: {
-            $Type: 'UI.DataField',
-            Label: 'PO Number',
-            Value: poNumber,
+        Title         : {
+            $Type   : 'UI.DataField',
+            Label   : 'PO Number',
+            Value   : poNumber,
             readonly: true
         },
 
-        Description: {
+        Description   : {
             $Type: 'UI.DataField',
             Label: 'Vendor',
             Value: vendor
@@ -463,26 +463,40 @@ annotate PurchaseOrderService.PurchaseOrders with @(
 
     UI.Identification: [
         {
-            $Type: 'UI.DataFieldForAction',
-            Action: 'PurchaseOrderService.submit',
-            Label: 'Submit',
-            Criticality: #Neutral
+            $Type      : 'UI.DataFieldForAction',
+            Action     : 'PurchaseOrderService.submit',
+            Label      : 'Submit',
         },
         {
-            $Type: 'UI.DataFieldForAction',
-            Action: 'PurchaseOrderService.approve',
-            Label: 'Approve',
-            Criticality: #Positive
+            $Type      : 'UI.DataFieldForAction',
+            Action     : 'PurchaseOrderService.approve',
+            Label      : 'Approve',
         },
         {
-            $Type: 'UI.DataFieldForAction',
-            Action: 'PurchaseOrderService.reject',
-            Label: 'Reject',
-            Criticality: #Negative
+            $Type      : 'UI.DataFieldForAction',
+            Action     : 'PurchaseOrderService.reject',
+            Label      : 'Reject',
+        },
+        {
+            $Type      : 'UI.DataFieldForAction',
+            Action     : 'PurchaseOrderService.cancel',
+            Label      : 'Cancel',
+        },
+
+        {
+            $Type      : 'UI.DataFieldForAction',
+            Action     : 'PurchaseOrderService.issue',
+            Label      : 'Issue',
+        },
+
+        {
+            $Type      : 'UI.DataFieldForAction',
+            Action     : 'PurchaseOrderService.complete',
+            Label      : 'Complete',
         }
     ],
 
-    UI.LineItem: [
+    UI.LineItem      : [
         {
             $Type: 'UI.DataField',
             Value: poNumber,
@@ -528,14 +542,13 @@ annotate PurchaseOrderService.PurchaseOrders with @(
 );
 
 annotate PurchaseOrderService.PurchaseOrderItems with {
-    netAmount @Common.FieldControl : #ReadOnly;
-    taxAmount @Common.FieldControl : #ReadOnly;
-    grossAmount @Common.FieldControl : #ReadOnly;
+    netAmount   @Common.FieldControl: #ReadOnly;
+    taxAmount   @Common.FieldControl: #ReadOnly;
+    grossAmount @Common.FieldControl: #ReadOnly;
 };
 
 annotate PurchaseOrderService.PurchaseOrders with {
-    status   @Common.FieldControl : #ReadOnly;
-    poNumber @Common.FieldControl : #ReadOnly;
-    totalAmount @Common.FieldControl : #ReadOnly;
+    status      @Common.FieldControl: #ReadOnly;
+    poNumber    @Common.FieldControl: #ReadOnly;
+    totalAmount @Common.FieldControl: #ReadOnly;
 };
-

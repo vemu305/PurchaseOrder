@@ -13,10 +13,6 @@ module.exports = cds.service.impl(async function () {
     } = this.entities;
 
 
-    // =========================================================
-    // HELPER - CALCULATE ITEM AMOUNTS
-    // =========================================================
-
 
     async function calculatePOTotal(poID) {
 
@@ -88,10 +84,6 @@ module.exports = cds.service.impl(async function () {
     }
 
 
-    // =========================================================
-    // HELPER - GET PO ID
-    // =========================================================
-
     function getPOId(req) {
 
         return (
@@ -101,11 +93,6 @@ module.exports = cds.service.impl(async function () {
         );
 
     }
-
-
-    // =========================================================
-    // HELPER - RECALCULATE PO TOTAL
-    // =========================================================
 
     async function recalculatePOTotal(POID, req) {
 
@@ -159,11 +146,6 @@ module.exports = cds.service.impl(async function () {
         return totalAmount;
     }
 
-
-    // =========================================================
-    // USER ROLE
-    // =========================================================
-
     function getUserRole(req) {
 
         if (req.user.is('Director'))
@@ -181,11 +163,6 @@ module.exports = cds.service.impl(async function () {
         return 'Employee';
 
     }
-
-
-    // =========================================================
-    // SUBMIT PO
-    // =========================================================
 
     this.on('submit', async (req) => {
 
@@ -434,11 +411,6 @@ module.exports = cds.service.impl(async function () {
 
     });
 
-
-    // =========================================================
-    // APPROVE PO
-    // =========================================================
-
     this.on('approve', async (req) => {
 
         console.log("");
@@ -628,11 +600,6 @@ module.exports = cds.service.impl(async function () {
 
     });
 
-
-    // =========================================================
-    // REJECT PO
-    // =========================================================
-
     this.on('reject', async (req) => {
 
         console.log("");
@@ -776,11 +743,6 @@ module.exports = cds.service.impl(async function () {
 
     });
 
-
-    // =========================================================
-    // CANCEL PO
-    // =========================================================
-
     this.on('cancel', async (req) => {
 
         console.log("");
@@ -901,10 +863,6 @@ module.exports = cds.service.impl(async function () {
     });
 
 
-    // =========================================================
-    // ISSUE PO
-    // =========================================================
-
     this.on('issue', async (req) => {
 
         console.log("");
@@ -983,10 +941,6 @@ module.exports = cds.service.impl(async function () {
 
     });
 
-
-    // =========================================================
-    // COMPLETE PO
-    // =========================================================
 
     this.on('complete', async (req) => {
 
@@ -1067,14 +1021,7 @@ module.exports = cds.service.impl(async function () {
     });
 
 
-    // =========================================================
-    // CREATE PO
-    // =========================================================
-
-    this.before(
-        'CREATE',
-        PurchaseOrders,
-        async (req) => {
+    this.before('CREATE',PurchaseOrders,async (req) => {
 
             console.log("");
             console.log("=================================");
@@ -1165,15 +1112,7 @@ module.exports = cds.service.impl(async function () {
         }
     );
 
-
-    // =========================================================
-    // CREATE / UPDATE PO VALIDATIONS
-    // =========================================================
-
-    this.before(
-        ['CREATE', 'UPDATE'],
-        PurchaseOrders,
-        async (req) => {
+    this.before( ['CREATE', 'UPDATE'],PurchaseOrders,async (req) => {
 
             console.log(
                 "PO Validation:",
@@ -1289,14 +1228,7 @@ module.exports = cds.service.impl(async function () {
     );
 
 
-    // =========================================================
-    // CREATE / UPDATE PO ITEMS
-    // =========================================================
-
-    this.before(
-        ['CREATE', 'UPDATE'],
-        PurchaseOrderItems,
-        async (req) => {
+    this.before(['CREATE', 'UPDATE'],PurchaseOrderItems,async (req) => {
 
             const item =
                 req.data;
@@ -1408,16 +1340,7 @@ module.exports = cds.service.impl(async function () {
         }
     );
 
-
-    // =========================================================
-    // AFTER CREATE / UPDATE ITEM
-    // RECALCULATE HEADER TOTAL
-    // =========================================================
-
-    this.after(
-        ['CREATE', 'UPDATE'],
-        PurchaseOrderItems,
-        async (data, req) => {
+    this.after(['CREATE', 'UPDATE'],PurchaseOrderItems,async (data, req) => {
 
             const POID =
                 data.parent_ID ||
@@ -1457,15 +1380,7 @@ module.exports = cds.service.impl(async function () {
     );
 
 
-    // =========================================================
-    // AFTER DELETE ITEM
-    // RECALCULATE HEADER TOTAL
-    // =========================================================
-
-    this.after(
-        'DELETE',
-        PurchaseOrderItems,
-        async (data, req) => {
+    this.after('DELETE',PurchaseOrderItems,async (data, req) => {
 
             const POID =
                 data.parent_ID ||
@@ -1500,15 +1415,7 @@ module.exports = cds.service.impl(async function () {
         }
     );
 
-
-    // =========================================================
-    // PREVENT ITEM MODIFICATION AFTER SUBMISSION
-    // =========================================================
-
-    this.before(
-        ['UPDATE', 'DELETE'],
-        PurchaseOrderItems,
-        async (req) => {
+    this.before(['UPDATE', 'DELETE'],PurchaseOrderItems, async (req) => {
 
             const ID =
                 req.data.ID;
@@ -1556,15 +1463,7 @@ module.exports = cds.service.impl(async function () {
         }
     );
 
-
-    // =========================================================
-    // PREVENT PO MODIFICATION AFTER SUBMISSION
-    // =========================================================
-
-    this.before(
-        'UPDATE',
-        PurchaseOrders,
-        async (req) => {
+    this.before('UPDATE',PurchaseOrders, async (req) => {
 
             const ID =
                 req.data.ID;
@@ -1600,16 +1499,7 @@ module.exports = cds.service.impl(async function () {
         }
     );
 
-
-    // =========================================================
-    // AFTER READ
-    // ACTION VISIBILITY
-    // =========================================================
-
-    this.after(
-        'READ',
-        PurchaseOrders,
-        async (data) => {
+    this.after('READ',PurchaseOrders,async (data) => {
 
             const rows =
                 Array.isArray(data)
