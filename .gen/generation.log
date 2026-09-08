@@ -1,0 +1,34 @@
+Starting CAP Project Generator...
+Using @sap/cds-dk [9.9.1] from /extbin/globals/bun/global/install/node_modules/@sap/cds-dk
+Using @sap/generator-cap-project [2.0.6] from [/extbin/globals/bun/global/install/node_modules/@sap/generator-cap-project]
+Using root path [/home/user/projects]
+
+Creating project with hana, mta, nodejs
+
+Adding facet: nodejs
+Adding facet: mta
+Adding facet: hana
+
+Successfully initialized CAP project
+Continue with: code purchase-order 
+
+
+Installing dependencies...
+
+added 260 packages, and audited 261 packages in 3s
+
+41 packages are looking for funding
+  run `npm fund` for details
+
+1 moderate severity vulnerability
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+Finished installing dependencies
+
+Done setting up project purchase-order
+Project is ready to use
+

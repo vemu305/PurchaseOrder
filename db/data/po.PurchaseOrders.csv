@@ -1,0 +1,4 @@
+ID,poNumber,prNumber,vendor,vendorContact,companyCode,purchasingOrg,purchasingGroup,poDate,deliveryDate,currency,totalAmount,status,approvalComments,rejectionComments
+11111111-1111-1111-1111-111111111111,PO2026100001,PR100001,ABC Construction Pvt Ltd,Ravi Kumar,1000,1000,PG01,2026-09-03,2026-10-15,INR,118000.00,Draft,,
+22222222-2222-2222-2222-222222222222,PO2026100002,PR100002,XYZ Suppliers Pvt Ltd,Anil Kumar,1000,1000,PG02,2026-09-03,2026-10-20,INR,59000.00,Submitted,,
+33333333-3333-3333-3333-333333333333,PO2026100003,PR100003,Global Materials Ltd,Suresh Kumar,1000,1000,PG01,2026-09-02,2026-10-10,INR,236000.00,Approved,Approved by Manager,
