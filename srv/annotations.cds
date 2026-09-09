@@ -90,6 +90,11 @@ annotate PurchaseOrderService.PurchaseOrders with @(
             ID    : 'ItemsFacet',
             Label : 'Purchase Order Items',
             Target: 'items/@UI.LineItem'
+        },
+        {
+            $Type : 'UI.ReferenceFacet',
+            Label : 'Audit Log',
+            Target: 'auditLogs/@UI.LineItem'
         }
     ],
 
@@ -463,36 +468,36 @@ annotate PurchaseOrderService.PurchaseOrders with @(
 
     UI.Identification: [
         {
-            $Type      : 'UI.DataFieldForAction',
-            Action     : 'PurchaseOrderService.submit',
-            Label      : 'Submit',
+            $Type : 'UI.DataFieldForAction',
+            Action: 'PurchaseOrderService.submit',
+            Label : 'Submit',
         },
         {
-            $Type      : 'UI.DataFieldForAction',
-            Action     : 'PurchaseOrderService.approve',
-            Label      : 'Approve',
+            $Type : 'UI.DataFieldForAction',
+            Action: 'PurchaseOrderService.approve',
+            Label : 'Approve',
         },
         {
-            $Type      : 'UI.DataFieldForAction',
-            Action     : 'PurchaseOrderService.reject',
-            Label      : 'Reject',
+            $Type : 'UI.DataFieldForAction',
+            Action: 'PurchaseOrderService.reject',
+            Label : 'Reject',
         },
         {
-            $Type      : 'UI.DataFieldForAction',
-            Action     : 'PurchaseOrderService.cancel',
-            Label      : 'Cancel',
-        },
-
-        {
-            $Type      : 'UI.DataFieldForAction',
-            Action     : 'PurchaseOrderService.issue',
-            Label      : 'Issue',
+            $Type : 'UI.DataFieldForAction',
+            Action: 'PurchaseOrderService.cancel',
+            Label : 'Cancel',
         },
 
         {
-            $Type      : 'UI.DataFieldForAction',
-            Action     : 'PurchaseOrderService.complete',
-            Label      : 'Complete',
+            $Type : 'UI.DataFieldForAction',
+            Action: 'PurchaseOrderService.issue',
+            Label : 'Issue',
+        },
+
+        {
+            $Type : 'UI.DataFieldForAction',
+            Action: 'PurchaseOrderService.complete',
+            Label : 'Complete',
         }
     ],
 
@@ -552,3 +557,135 @@ annotate PurchaseOrderService.PurchaseOrders with {
     poNumber    @Common.FieldControl: #ReadOnly;
     totalAmount @Common.FieldControl: #ReadOnly;
 };
+
+annotate PurchaseOrderService.PurchaseOrders with {
+
+    prNumber @Common.ValueList: {
+        $Type         : 'Common.ValueListType',
+        CollectionPath: 'ApprovedPurchaseRequests',
+
+        Parameters    : [
+
+            {
+                $Type            : 'Common.ValueListParameterInOut',
+                LocalDataProperty: prNumber,
+                ValueListProperty: 'requestNumber'
+            },
+
+            {
+                $Type            : 'Common.ValueListParameterDisplayOnly',
+                ValueListProperty: 'requesterName'
+            },
+
+            {
+                $Type            : 'Common.ValueListParameterDisplayOnly',
+                ValueListProperty: 'department'
+            },
+
+            {
+                $Type            : 'Common.ValueListParameterDisplayOnly',
+                ValueListProperty: 'requestDate'
+            },
+
+            {
+                $Type            : 'Common.ValueListParameterDisplayOnly',
+                ValueListProperty: 'currency'
+            },
+
+            {
+                $Type            : 'Common.ValueListParameterDisplayOnly',
+                ValueListProperty: 'totalAmount'
+            },
+
+            {
+                $Type            : 'Common.ValueListParameterDisplayOnly',
+                ValueListProperty: 'status'
+            }
+        ]
+    };
+
+};
+
+annotate PurchaseOrderService.ApprovedPurchaseRequests with @UI.LineItem: [
+    {
+        $Type: 'UI.DataField',
+        Value: requestNumber,
+        Label: 'PR Number'
+    },
+    {
+        $Type: 'UI.DataField',
+        Value: requesterName,
+        Label: 'Requester'
+    },
+    {
+        $Type: 'UI.DataField',
+        Value: department,
+        Label: 'Department'
+    },
+    {
+        $Type: 'UI.DataField',
+        Value: requestDate,
+        Label: 'Request Date'
+    },
+    {
+        $Type: 'UI.DataField',
+        Value: currency,
+        Label: 'Currency'
+    },
+    {
+        $Type: 'UI.DataField',
+        Value: totalAmount,
+        Label: 'Total Amount'
+    },
+    {
+        $Type: 'UI.DataField',
+        Value: status,
+        Label: 'Status'
+    }
+];
+
+annotate PurchaseOrderService.PurchaseOrderAuditLogs with @UI.LineItem: [
+
+    {
+        $Type : 'UI.DataField',
+        Value : action,
+        Label : 'Action'
+    },
+
+    {
+        $Type : 'UI.DataField',
+        Value : oldStatus,
+        Label : 'Old Status'
+    },
+
+    {
+        $Type : 'UI.DataField',
+        Value : newStatus,
+        Label : 'New Status'
+    },
+
+    {
+        $Type : 'UI.DataField',
+        Value : performedBy,
+        Label : 'Performed By'
+    },
+
+    {
+        $Type : 'UI.DataField',
+        Value : performedRole,
+        Label : 'Role'
+    },
+
+    {
+        $Type : 'UI.DataField',
+        Value : remarks,
+        Label : 'Remarks'
+    },
+
+    {
+        $Type : 'UI.DataField',
+        Value : eventTime,
+        Label : 'Event Time'
+    }
+
+];

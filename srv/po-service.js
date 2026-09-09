@@ -1,4 +1,5 @@
 const cds = require('@sap/cds');
+const axios = require('axios');
 
 module.exports = cds.service.impl(async function () {
 
@@ -9,10 +10,94 @@ module.exports = cds.service.impl(async function () {
 
     const {
         PurchaseOrders,
-        PurchaseOrderItems
+        PurchaseOrderItems,
+        PurchaseOrderAuditLogs
     } = this.entities;
 
 
+    async function createAuditLog(req, data) {
+
+        await INSERT.into(PurchaseOrderAuditLogs).entries({
+
+            purchaseOrder_ID: data.purchaseOrderID,
+
+            poNumber: data.poNumber || "",
+
+            prNumber: data.prNumber || "",
+
+            action: data.action,
+
+            oldStatus: data.oldStatus || "",
+
+            newStatus: data.newStatus || "",
+
+            performedBy:
+                req?.user?.id ||
+                "anonymous",
+
+            performedRole:
+                data.role ||
+                getUserRole(req),
+
+            remarks:
+                data.remarks ||
+                "",
+
+            eventTime: new Date()
+
+        });
+
+    }
+
+    async function getPRAccessToken() {
+        const response = await axios.post(
+            process.env.PR_TOKEN_URL,
+            new URLSearchParams({
+                grant_type: 'client_credentials'
+            }).toString(),
+            {
+                auth: {
+                    username: process.env.PR_CLIENT_ID,
+                    password: process.env.PR_CLIENT_SECRET
+                },
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
+        );
+
+        return response.data.access_token;
+    }
+
+
+    async function fetchApprovedPRs() {
+
+        const accessToken = await getPRAccessToken();
+
+        console.log("----------============------------", accessToken);
+
+
+        // IMPORTANT:
+        // Build the OData filter directly in the URL.
+        const url =
+            `${process.env.PR_SERVICE_URL}?$filter=status%20eq%20%27approved%27`;
+
+        console.log('PR API URL:', url);
+
+        const response = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: 'application/json'
+            }
+        });
+
+        console.log(
+            'Approved PR count:',
+            response.data.value?.length || 0
+        );
+
+        return response.data.value || [];
+    }
 
     async function calculatePOTotal(poID) {
 
@@ -237,6 +322,26 @@ module.exports = cds.service.impl(async function () {
 
         }
 
+        await createAuditLog(req, {
+
+            purchaseOrderID: ID,
+
+            poNumber: po.poNumber,
+
+            prNumber: po.prNumber,
+
+            action: "SUBMITTED",
+
+            oldStatus: po.status,
+
+            newStatus: "Submitted",
+
+            role: getUserRole(req),
+
+            remarks: "Purchase Order submitted for approval"
+
+        });
+
 
         // =====================================================
         // GET ITEMS
@@ -411,6 +516,8 @@ module.exports = cds.service.impl(async function () {
 
     });
 
+
+
     this.on('approve', async (req) => {
 
         console.log("");
@@ -583,6 +690,27 @@ module.exports = cds.service.impl(async function () {
             `Purchase Order ${po.poNumber} approved`
         );
 
+        await createAuditLog(req, {
+
+            purchaseOrderID: ID,
+
+            poNumber: po.poNumber,
+
+            prNumber: po.prNumber,
+
+            action: "APPROVED",
+
+            oldStatus: po.status,
+
+            newStatus: "Approved",
+
+            role: getUserRole(req),
+
+            remarks:
+                comments ||
+                "Purchase Order approved"
+
+        });
 
         // =====================================================
         // RETURN UPDATED PO
@@ -722,6 +850,27 @@ module.exports = cds.service.impl(async function () {
             });
 
 
+        await createAuditLog(req, {
+
+            purchaseOrderID: ID,
+
+            poNumber: po.poNumber,
+
+            prNumber: po.prNumber,
+
+            action: "REJECTED",
+
+            oldStatus: po.status,
+
+            newStatus: "Rejected",
+
+            role: getUserRole(req),
+
+            remarks: reason
+
+        });
+
+
         console.log(
             `Purchase Order ${po.poNumber} rejected`
         );
@@ -841,6 +990,27 @@ module.exports = cds.service.impl(async function () {
             });
 
 
+        await createAuditLog(req, {
+
+            purchaseOrderID: ID,
+
+            poNumber: po.poNumber,
+
+            prNumber: po.prNumber,
+
+            action: "CANCELLED",
+
+            oldStatus: po.status,
+
+            newStatus: "Cancelled",
+
+            role: getUserRole(req),
+
+            remarks: "Purchase Order cancelled"
+
+        });
+
+
         console.log(
             `Purchase Order ${po.poNumber} cancelled`
         );
@@ -927,6 +1097,26 @@ module.exports = cds.service.impl(async function () {
                 ID
             });
 
+        await createAuditLog(req, {
+
+            purchaseOrderID: ID,
+
+            poNumber: po.poNumber,
+
+            prNumber: po.prNumber,
+
+            action: "ISSUED",
+
+            oldStatus: po.status,
+
+            newStatus: "Issued",
+
+            role: getUserRole(req),
+
+            remarks: "Purchase Order issued"
+
+        });
+
 
         console.log(
             `Purchase Order ${po.poNumber} issued`
@@ -1006,6 +1196,26 @@ module.exports = cds.service.impl(async function () {
                 ID
             });
 
+        await createAuditLog(req, {
+
+            purchaseOrderID: ID,
+
+            poNumber: po.poNumber,
+
+            prNumber: po.prNumber,
+
+            action: "COMPLETED",
+
+            oldStatus: po.status,
+
+            newStatus: "Completed",
+
+            role: getUserRole(req),
+
+            remarks: "Purchase Order completed"
+
+        });
+
 
         console.log(
             `Purchase Order ${po.poNumber} completed`
@@ -1021,551 +1231,581 @@ module.exports = cds.service.impl(async function () {
     });
 
 
-    this.before('CREATE',PurchaseOrders,async (req) => {
+    this.on('READ', 'ApprovedPurchaseRequests', async (req) => {
 
-            console.log("");
-            console.log("=================================");
-            console.log("CREATE PURCHASE ORDER");
-            console.log("=================================");
+        try {
+
+            const prs = await fetchApprovedPRs();
+
+            return prs.map(pr => ({
+                requestNumber: pr.requestNumber,
+                requesterName: pr.requesterName,
+                department: pr.department_code || '',
+                requestDate: pr.requestDate,
+                currency: pr.currency,
+                totalAmount: pr.totalAmount,
+                status: pr.status
+            }));
+
+        } catch (error) {
+
+            console.error(
+                'Failed to load Approved Purchase Requests:',
+                error.message
+            );
+
+            return req.reject(
+                502,
+                'Unable to fetch Approved Purchase Requests'
+            );
+        }
+    });
+
+    this.before('CREATE', PurchaseOrders, async (req) => {
+
+        console.log("");
+        console.log("=================================");
+        console.log("CREATE PURCHASE ORDER");
+        console.log("=================================");
 
 
-            const currentYear =
-                new Date().getFullYear();
+        const currentYear =
+            new Date().getFullYear();
 
 
-            // =================================================
-            // FIND LAST PO NUMBER
-            // =================================================
+        // =================================================
+        // FIND LAST PO NUMBER
+        // =================================================
 
-            const lastPO =
-                await SELECT.one
-                    .from(PurchaseOrders)
-                    .columns(
-                        'poNumber'
-                    )
-                    .where(
-                        `poNumber like 'PO-${currentYear}-%'`
-                    )
-                    .orderBy({
-                        poNumber: 'desc'
-                    });
+        const lastPO =
+            await SELECT.one
+                .from(PurchaseOrders)
+                .columns(
+                    'poNumber'
+                )
+                .where(
+                    `poNumber like 'PO-${currentYear}-%'`
+                )
+                .orderBy({
+                    poNumber: 'desc'
+                });
 
 
-            let nextNumber = 1;
+        let nextNumber = 1;
+
+
+        if (
+            lastPO &&
+            lastPO.poNumber
+        ) {
+
+            const parts =
+                lastPO.poNumber.split('-');
 
 
             if (
-                lastPO &&
-                lastPO.poNumber
+                parts.length === 3
             ) {
 
-                const parts =
-                    lastPO.poNumber.split('-');
+                const lastNumber =
+                    parseInt(
+                        parts[2],
+                        10
+                    );
 
 
                 if (
-                    parts.length === 3
+                    !isNaN(lastNumber)
                 ) {
 
-                    const lastNumber =
-                        parseInt(
-                            parts[2],
-                            10
-                        );
-
-
-                    if (
-                        !isNaN(lastNumber)
-                    ) {
-
-                        nextNumber =
-                            lastNumber + 1;
-
-                    }
+                    nextNumber =
+                        lastNumber + 1;
 
                 }
 
             }
 
-
-            // =================================================
-            // GENERATE PO NUMBER
-            // =================================================
-
-            req.data.poNumber =
-                `PO-${currentYear}-${String(nextNumber).padStart(6, '0')}`;
+        }
 
 
-            // =================================================
-            // DEFAULT STATUS
-            // =================================================
+        // =================================================
+        // GENERATE PO NUMBER
+        // =================================================
 
-            req.data.status =
-                "Draft";
+        req.data.poNumber =
+            `PO-${currentYear}-${String(nextNumber).padStart(6, '0')}`;
 
 
-            console.log(
-                "Generated PO Number:",
-                req.data.poNumber
+        // =================================================
+        // DEFAULT STATUS
+        // =================================================
+
+        req.data.status =
+            "Draft";
+
+
+        console.log(
+            "Generated PO Number:",
+            req.data.poNumber
+        );
+
+    }
+    );
+
+    this.before(['CREATE', 'UPDATE'], PurchaseOrders, async (req) => {
+
+        console.log(
+            "PO Validation:",
+            req.data
+        );
+
+
+        // =================================================
+        // VENDOR
+        // =================================================
+
+        if (
+            req.data.vendor !== undefined &&
+            (
+                !req.data.vendor ||
+                !req.data.vendor.trim()
+            )
+        ) {
+
+            req.error(
+                400,
+                "Vendor is mandatory."
             );
 
         }
-    );
 
-    this.before( ['CREATE', 'UPDATE'],PurchaseOrders,async (req) => {
 
-            console.log(
-                "PO Validation:",
-                req.data
+        // =================================================
+        // CURRENCY
+        // =================================================
+
+        if (
+            req.data.currency !== undefined &&
+            (
+                !req.data.currency ||
+                !req.data.currency.trim()
+            )
+        ) {
+
+            req.error(
+                400,
+                "Currency is mandatory."
+            );
+
+        }
+
+
+        // =================================================
+        // DELIVERY DATE
+        // =================================================
+
+        if (
+            req.data.deliveryDate
+        ) {
+
+            const today =
+                new Date();
+
+
+            const deliveryDate =
+                new Date(
+                    req.data.deliveryDate
+                );
+
+
+            today.setHours(
+                0,
+                0,
+                0,
+                0
             );
 
 
-            // =================================================
-            // VENDOR
-            // =================================================
+            deliveryDate.setHours(
+                0,
+                0,
+                0,
+                0
+            );
+
 
             if (
-                req.data.vendor !== undefined &&
-                (
-                    !req.data.vendor ||
-                    !req.data.vendor.trim()
-                )
+                deliveryDate < today
             ) {
 
                 req.error(
                     400,
-                    "Vendor is mandatory."
+                    "Delivery Date cannot be in the past."
                 );
 
             }
 
-
-            // =================================================
-            // CURRENCY
-            // =================================================
-
-            if (
-                req.data.currency !== undefined &&
-                (
-                    !req.data.currency ||
-                    !req.data.currency.trim()
-                )
-            ) {
-
-                req.error(
-                    400,
-                    "Currency is mandatory."
-                );
-
-            }
+        }
 
 
-            // =================================================
-            // DELIVERY DATE
-            // =================================================
+        // =================================================
+        // TOTAL AMOUNT
+        // =================================================
 
-            if (
-                req.data.deliveryDate
-            ) {
+        if (
+            req.data.totalAmount !== undefined &&
+            Number(req.data.totalAmount) < 0
+        ) {
 
-                const today =
-                    new Date();
+            req.error(
+                400,
+                "Total Amount cannot be negative."
+            );
 
+        }
 
-                const deliveryDate =
-                    new Date(
-                        req.data.deliveryDate
-                    );
-
-
-                today.setHours(
-                    0,
-                    0,
-                    0,
-                    0
-                );
+    }
+    );
 
 
-                deliveryDate.setHours(
-                    0,
-                    0,
-                    0,
-                    0
-                );
+    this.before(['CREATE', 'UPDATE'], PurchaseOrderItems, async (req) => {
+
+        const item =
+            req.data;
 
 
-                if (
-                    deliveryDate < today
-                ) {
+        // =================================================
+        // QUANTITY
+        // =================================================
 
-                    req.error(
-                        400,
-                        "Delivery Date cannot be in the past."
-                    );
+        if (
+            item.quantity !== undefined &&
+            Number(item.quantity) <= 0
+        ) {
 
+            req.error(
+                400,
+                "Quantity must be greater than zero."
+            );
+
+        }
+
+
+        // =================================================
+        // UNIT PRICE
+        // =================================================
+
+        if (
+            item.unitPrice !== undefined &&
+            Number(item.unitPrice) <= 0
+        ) {
+
+            req.error(
+                400,
+                "Unit Price must be greater than zero."
+            );
+
+        }
+
+
+        // =================================================
+        // DESCRIPTION
+        // =================================================
+
+        if (
+            item.description !== undefined &&
+            (
+                !item.description ||
+                item.description.trim().length < 3
+            )
+        ) {
+
+            req.error(
+                400,
+                "Description must contain at least 3 characters."
+            );
+
+        }
+
+
+        // =================================================
+        // TAX
+        // =================================================
+
+        if (
+            item.taxPercent !== undefined &&
+            (
+                Number(item.taxPercent) < 0 ||
+                Number(item.taxPercent) > 100
+            )
+        ) {
+
+            req.error(
+                400,
+                "Tax percentage must be between 0 and 100."
+            );
+
+        }
+
+
+        // =================================================
+        // CALCULATE ITEM AMOUNTS
+        // =================================================
+
+        // If Quantity or Unit Price is being changed,
+        // calculate all amounts.
+
+        if (
+            item.quantity !== undefined ||
+            item.unitPrice !== undefined ||
+            item.taxPercent !== undefined
+        ) {
+
+            calculateItem(item);
+
+            console.log(
+                "Calculated Item:",
+                {
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    taxPercent: item.taxPercent,
+                    netAmount: item.netAmount,
+                    taxAmount: item.taxAmount,
+                    grossAmount: item.grossAmount
                 }
-
-            }
-
-
-            // =================================================
-            // TOTAL AMOUNT
-            // =================================================
-
-            if (
-                req.data.totalAmount !== undefined &&
-                Number(req.data.totalAmount) < 0
-            ) {
-
-                req.error(
-                    400,
-                    "Total Amount cannot be negative."
-                );
-
-            }
-
-        }
-    );
-
-
-    this.before(['CREATE', 'UPDATE'],PurchaseOrderItems,async (req) => {
-
-            const item =
-                req.data;
-
-
-            // =================================================
-            // QUANTITY
-            // =================================================
-
-            if (
-                item.quantity !== undefined &&
-                Number(item.quantity) <= 0
-            ) {
-
-                req.error(
-                    400,
-                    "Quantity must be greater than zero."
-                );
-
-            }
-
-
-            // =================================================
-            // UNIT PRICE
-            // =================================================
-
-            if (
-                item.unitPrice !== undefined &&
-                Number(item.unitPrice) <= 0
-            ) {
-
-                req.error(
-                    400,
-                    "Unit Price must be greater than zero."
-                );
-
-            }
-
-
-            // =================================================
-            // DESCRIPTION
-            // =================================================
-
-            if (
-                item.description !== undefined &&
-                (
-                    !item.description ||
-                    item.description.trim().length < 3
-                )
-            ) {
-
-                req.error(
-                    400,
-                    "Description must contain at least 3 characters."
-                );
-
-            }
-
-
-            // =================================================
-            // TAX
-            // =================================================
-
-            if (
-                item.taxPercent !== undefined &&
-                (
-                    Number(item.taxPercent) < 0 ||
-                    Number(item.taxPercent) > 100
-                )
-            ) {
-
-                req.error(
-                    400,
-                    "Tax percentage must be between 0 and 100."
-                );
-
-            }
-
-
-            // =================================================
-            // CALCULATE ITEM AMOUNTS
-            // =================================================
-
-            // If Quantity or Unit Price is being changed,
-            // calculate all amounts.
-
-            if (
-                item.quantity !== undefined ||
-                item.unitPrice !== undefined ||
-                item.taxPercent !== undefined
-            ) {
-
-                calculateItem(item);
-
-                console.log(
-                    "Calculated Item:",
-                    {
-                        quantity: item.quantity,
-                        unitPrice: item.unitPrice,
-                        taxPercent: item.taxPercent,
-                        netAmount: item.netAmount,
-                        taxAmount: item.taxAmount,
-                        grossAmount: item.grossAmount
-                    }
-                );
-
-            }
-
-        }
-    );
-
-    this.after(['CREATE', 'UPDATE'],PurchaseOrderItems,async (data, req) => {
-
-            const POID =
-                data.parent_ID ||
-                req.data?.parent_ID;
-
-
-            if (!POID)
-                return;
-
-
-            // Only recalculate for Draft POs
-            // because submitted/approved/etc. should not
-            // be modified.
-
-            const po =
-                await SELECT.one
-                    .from(PurchaseOrders)
-                    .where({
-                        ID: POID
-                    });
-
-
-            if (!po)
-                return;
-
-
-            if (po.status !== "Draft")
-                return;
-
-
-            await recalculatePOTotal(
-                POID,
-                req
             );
 
         }
+
+    }
+    );
+
+    this.after(['CREATE', 'UPDATE'], PurchaseOrderItems, async (data, req) => {
+
+        const POID =
+            data.parent_ID ||
+            req.data?.parent_ID;
+
+
+        if (!POID)
+            return;
+
+
+        // Only recalculate for Draft POs
+        // because submitted/approved/etc. should not
+        // be modified.
+
+        const po =
+            await SELECT.one
+                .from(PurchaseOrders)
+                .where({
+                    ID: POID
+                });
+
+
+        if (!po)
+            return;
+
+
+        if (po.status !== "Draft")
+            return;
+
+
+        await recalculatePOTotal(
+            POID,
+            req
+        );
+
+    }
     );
 
 
-    this.after('DELETE',PurchaseOrderItems,async (data, req) => {
+    this.after('DELETE', PurchaseOrderItems, async (data, req) => {
 
-            const POID =
-                data.parent_ID ||
-                req.data?.parent_ID;
-
-
-            if (!POID)
-                return;
+        const POID =
+            data.parent_ID ||
+            req.data?.parent_ID;
 
 
-            const po =
-                await SELECT.one
-                    .from(PurchaseOrders)
-                    .where({
-                        ID: POID
-                    });
+        if (!POID)
+            return;
 
 
-            if (!po)
-                return;
+        const po =
+            await SELECT.one
+                .from(PurchaseOrders)
+                .where({
+                    ID: POID
+                });
 
 
-            if (po.status !== "Draft")
-                return;
+        if (!po)
+            return;
 
 
-            await recalculatePOTotal(
-                POID,
-                req
+        if (po.status !== "Draft")
+            return;
+
+
+        await recalculatePOTotal(
+            POID,
+            req
+        );
+
+    }
+    );
+
+    this.before(['UPDATE', 'DELETE'], PurchaseOrderItems, async (req) => {
+
+        const ID =
+            req.data.ID;
+
+
+        if (!ID)
+            return;
+
+
+        const item =
+            await SELECT.one
+                .from(PurchaseOrderItems)
+                .where({
+                    ID
+                });
+
+
+        if (!item)
+            return;
+
+
+        const po =
+            await SELECT.one
+                .from(PurchaseOrders)
+                .where({
+                    ID: item.parent_ID
+                });
+
+
+        if (!po)
+            return;
+
+
+        if (
+            po.status !== "Draft"
+        ) {
+
+            req.error(
+                400,
+                "Purchase Order items can only be modified when the Purchase Order is in Draft status."
             );
 
         }
+
+    }
     );
 
-    this.before(['UPDATE', 'DELETE'],PurchaseOrderItems, async (req) => {
+    this.before('UPDATE', PurchaseOrders, async (req) => {
 
-            const ID =
-                req.data.ID;
-
-
-            if (!ID)
-                return;
+        const ID =
+            req.data.ID;
 
 
-            const item =
-                await SELECT.one
-                    .from(PurchaseOrderItems)
-                    .where({
-                        ID
-                    });
+        if (!ID)
+            return;
 
 
-            if (!item)
-                return;
+        const po =
+            await SELECT.one
+                .from(PurchaseOrders)
+                .where({
+                    ID
+                });
 
 
-            const po =
-                await SELECT.one
-                    .from(PurchaseOrders)
-                    .where({
-                        ID: item.parent_ID
-                    });
+        if (!po)
+            return;
 
+
+        if (
+            po.status !== "Draft"
+        ) {
+
+            req.error(
+                400,
+                "Only Purchase Orders in Draft status can be edited."
+            );
+
+        }
+
+    }
+    );
+
+    this.after('READ', PurchaseOrders, async (data) => {
+
+        const rows =
+            Array.isArray(data)
+                ? data
+                : [data];
+
+
+        for (
+            const po of rows
+        ) {
 
             if (!po)
-                return;
+                continue;
 
 
-            if (
-                po.status !== "Draft"
-            ) {
+            // =================================================
+            // SUBMIT
+            // =================================================
 
-                req.error(
-                    400,
-                    "Purchase Order items can only be modified when the Purchase Order is in Draft status."
-                );
-
-            }
-
-        }
-    );
-
-    this.before('UPDATE',PurchaseOrders, async (req) => {
-
-            const ID =
-                req.data.ID;
+            po.hideSubmit =
+                po.status !== "Draft";
 
 
-            if (!ID)
-                return;
+            // =================================================
+            // APPROVE
+            // =================================================
+
+            po.hideApprove =
+                po.status !== "Submitted";
 
 
-            const po =
-                await SELECT.one
-                    .from(PurchaseOrders)
-                    .where({
-                        ID
-                    });
+            // =================================================
+            // REJECT
+            // =================================================
+
+            po.hideReject =
+                po.status !== "Submitted";
 
 
-            if (!po)
-                return;
+            // =================================================
+            // CANCEL
+            // =================================================
+
+            po.canCancel =
+                po.status === "Draft" ||
+                po.status === "Submitted";
 
 
-            if (
-                po.status !== "Draft"
-            ) {
+            // =================================================
+            // ISSUE
+            // =================================================
 
-                req.error(
-                    400,
-                    "Only Purchase Orders in Draft status can be edited."
-                );
-
-            }
-
-        }
-    );
-
-    this.after('READ',PurchaseOrders,async (data) => {
-
-            const rows =
-                Array.isArray(data)
-                    ? data
-                    : [data];
+            po.hideIssue =
+                po.status !== "Approved";
 
 
-            for (
-                const po of rows
-            ) {
+            // =================================================
+            // COMPLETE
+            // =================================================
 
-                if (!po)
-                    continue;
-
-
-                // =================================================
-                // SUBMIT
-                // =================================================
-
-                po.hideSubmit =
-                    po.status !== "Draft";
-
-
-                // =================================================
-                // APPROVE
-                // =================================================
-
-                po.hideApprove =
-                    po.status !== "Submitted";
-
-
-                // =================================================
-                // REJECT
-                // =================================================
-
-                po.hideReject =
-                    po.status !== "Submitted";
-
-
-                // =================================================
-                // CANCEL
-                // =================================================
-
-                po.canCancel =
-                    po.status === "Draft" ||
-                    po.status === "Submitted";
-
-
-                // =================================================
-                // ISSUE
-                // =================================================
-
-                po.hideIssue =
-                    po.status !== "Approved";
-
-
-                // =================================================
-                // COMPLETE
-                // =================================================
-
-                po.hideComplete =
-                    po.status !== "Issued";
-
-            }
+            po.hideComplete =
+                po.status !== "Issued";
 
         }
+
+    }
     );
 
     this.before(['CREATE', 'UPDATE'], PurchaseOrderItems, async (req) => {
@@ -1666,5 +1906,106 @@ module.exports = cds.service.impl(async function () {
             });
         }
     });
+
+    this.after('CREATE', PurchaseOrders, async (data, req) => {
+
+        await createAuditLog(req, {
+
+            purchaseOrderID: data.ID,
+
+            poNumber: data.poNumber,
+
+            prNumber: data.prNumber,
+
+            action: "CREATED",
+
+            oldStatus: "",
+
+            newStatus: "Draft",
+
+            role: getUserRole(req),
+
+            remarks: "Purchase Order Created"
+
+        });
+
+    });
+
+    this.after('UPDATE', PurchaseOrders, async (data, req) => {
+
+        if (!data)
+            return;
+
+        await createAuditLog(req, {
+
+            purchaseOrderID: data.ID,
+
+            poNumber: data.poNumber,
+
+            prNumber: data.prNumber,
+
+            action: "UPDATED",
+
+            oldStatus: data.status,
+
+            newStatus: data.status,
+
+            role: getUserRole(req),
+
+            remarks: "Purchase Order Updated"
+
+        });
+
+    });
+
+    this.after('READ', 'PurchaseOrderAuditLogs', logs => {
+
+    const setCriticality = log => {
+
+        if (!log)
+            return;
+
+        switch (log.newStatus) {
+
+            case 'Draft':
+                log.criticality = 2;
+                break;
+
+            case 'Submitted':
+                log.criticality = 3;
+                break;
+
+            case 'Approved':
+                log.criticality = 3;
+                break;
+
+            case 'Issued':
+                log.criticality = 3;
+                break;
+
+            case 'Completed':
+                log.criticality = 3;
+                break;
+
+            case 'Rejected':
+                log.criticality = 1;
+                break;
+
+            case 'Cancelled':
+                log.criticality = 1;
+                break;
+
+            default:
+                log.criticality = 0;
+        }
+
+    };
+
+    if (Array.isArray(logs))
+        logs.forEach(setCriticality);
+    else
+        setCriticality(logs);
+
+});
 
 });

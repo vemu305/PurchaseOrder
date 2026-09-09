@@ -3,6 +3,16 @@ using po from '../db/schema';
 @requires: 'authenticated-user'
 service PurchaseOrderService {
 
+    entity ApprovedPurchaseRequests {
+        key requestNumber : String(20);
+        requesterName     : String(100);
+        department        : String(100);
+        requestDate       : Date;
+        currency          : String(3);
+        totalAmount       : Decimal(15,2);
+        status            : String(20);
+    }
+
     @odata.draft.enabled
     entity PurchaseOrders as projection on po.PurchaseOrders
         actions {
@@ -38,4 +48,8 @@ service PurchaseOrderService {
 
     entity PurchasingGroups
         as projection on po.PurchasingGroups;
+
+    entity PurchaseOrderAuditLogs 
+        as projection on po.PurchaseOrderAuditLogs;
+
 }
