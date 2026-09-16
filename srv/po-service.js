@@ -101,11 +101,16 @@ module.exports = cds.service.impl(async function () {
 
     async function calculatePOTotal(poID) {
 
+
+
         const items = await SELECT
             .from(PurchaseOrderItems)
             .where({ parent_ID: poID });
 
         let totalAmount = 0;
+
+        console.log("-------=============--------------8888");
+
 
         for (const item of items) {
 
@@ -127,16 +132,10 @@ module.exports = cds.service.impl(async function () {
         return totalAmount;
     }
 
-
     function calculateItem(item) {
+        const quantity = Number(item.quantity || 0);
+        const unitPrice = Number(item.unitPrice || 0);
 
-        const quantity =
-            Number(item.quantity || 0);
-
-        const unitPrice =
-            Number(item.unitPrice || 0);
-
-        // If taxPercent is not entered, use 18%
         const taxPercent =
             Number(
                 item.taxPercent !== undefined &&
@@ -145,29 +144,16 @@ module.exports = cds.service.impl(async function () {
                     : 18
             );
 
-        const netAmount =
-            quantity * unitPrice;
+        const netAmount = quantity * unitPrice;
+        const taxAmount = netAmount * taxPercent / 100;
+        const grossAmount = netAmount + taxAmount;
 
-        const taxAmount =
-            netAmount * taxPercent / 100;
-
-        const grossAmount =
-            netAmount + taxAmount;
-
-
-        item.netAmount =
-            Number(netAmount.toFixed(2));
-
-        item.taxAmount =
-            Number(taxAmount.toFixed(2));
-
-        item.grossAmount =
-            Number(grossAmount.toFixed(2));
-
+        item.netAmount = Number(netAmount.toFixed(2));
+        item.taxAmount = Number(taxAmount.toFixed(2));
+        item.grossAmount = Number(grossAmount.toFixed(2));
 
         return item;
     }
-
 
     function getPOId(req) {
 
@@ -180,6 +166,9 @@ module.exports = cds.service.impl(async function () {
     }
 
     async function recalculatePOTotal(POID, req) {
+
+        console.log("-------=============--------------9999");
+
 
         if (!POID)
             return 0;
@@ -515,8 +504,6 @@ module.exports = cds.service.impl(async function () {
         return updatedPO;
 
     });
-
-
 
     this.on('approve', async (req) => {
 
@@ -1447,7 +1434,6 @@ module.exports = cds.service.impl(async function () {
 
         }
 
-
         // =================================================
         // TOTAL AMOUNT
         // =================================================
@@ -1469,6 +1455,14 @@ module.exports = cds.service.impl(async function () {
 
 
     this.before(['CREATE', 'UPDATE'], PurchaseOrderItems, async (req) => {
+
+        const POID =
+            data.parent_ID ||
+            req.data?.parent_ID;
+
+
+        if (!POID)
+            return;
 
         const item =
             req.data;
@@ -1576,6 +1570,15 @@ module.exports = cds.service.impl(async function () {
             );
 
         }
+
+        await recalculatePOTotal(
+            POID,
+            req
+        );
+        await calculatePOTotal(
+            POID,
+            req
+        );
 
     }
     );
@@ -1960,52 +1963,107 @@ module.exports = cds.service.impl(async function () {
 
     this.after('READ', 'PurchaseOrderAuditLogs', logs => {
 
-    const setCriticality = log => {
+        const setCriticality = log => {
 
-        if (!log)
-            return;
+            if (!log)
+                return;
 
-        switch (log.newStatus) {
+            switch (log.newStatus) {
 
-            case 'Draft':
-                log.criticality = 2;
-                break;
+                case 'Draft':
+                    log.criticality = 2;
+                    break;
 
-            case 'Submitted':
-                log.criticality = 3;
-                break;
+                case 'Submitted':
+                    log.criticality = 3;
+                    break;
 
-            case 'Approved':
-                log.criticality = 3;
-                break;
+                case 'Approved':
+                    log.criticality = 3;
+                    break;
 
-            case 'Issued':
-                log.criticality = 3;
-                break;
+                case 'Issued':
+                    log.criticality = 3;
+                    break;
 
-            case 'Completed':
-                log.criticality = 3;
-                break;
+                case 'Completed':
+                    log.criticality = 3;
+                    break;
 
-            case 'Rejected':
-                log.criticality = 1;
-                break;
+                case 'Rejected':
+                    log.criticality = 1;
+                    break;
 
-            case 'Cancelled':
-                log.criticality = 1;
-                break;
+                case 'Cancelled':
+                    log.criticality = 1;
+                    break;
 
-            default:
-                log.criticality = 0;
-        }
+                default:
+                    log.criticality = 0;
+            }
 
-    };
+        };
 
-    if (Array.isArray(logs))
-        logs.forEach(setCriticality);
-    else
-        setCriticality(logs);
+        if (Array.isArray(logs))
+            logs.forEach(setCriticality);
+        else
+            setCriticality(logs);
 
+    });
+    this.after(['CREATE', 'UPDATE'], PurchaseOrders, async (data, req) => {
+
+    const POID = data.ID;
+
+    if (!POID)
+        return;
+
+    const items = await SELECT
+        .from(PurchaseOrderItems)
+        .where({
+            parent_ID: POID
+        });
+
+    let totalAmount = 0;
+
+    for (const item of items) {
+
+        const quantity = Number(item.quantity || 0);
+        const unitPrice = Number(item.unitPrice || 0);
+        const taxPercent = 18;
+
+        const netAmount =
+            quantity * unitPrice;
+
+        const taxAmount =
+            netAmount * taxPercent / 100;
+
+        const grossAmount =
+            netAmount + taxAmount;
+
+        await UPDATE(PurchaseOrderItems)
+            .set({
+                taxPercent: taxPercent,
+                netAmount: Number(netAmount.toFixed(2)),
+                taxAmount: Number(taxAmount.toFixed(2)),
+                grossAmount: Number(grossAmount.toFixed(2))
+            })
+            .where({
+                ID: item.ID
+            });
+
+        totalAmount += grossAmount;
+    }
+
+    totalAmount =
+        Number(totalAmount.toFixed(2));
+
+    await UPDATE(PurchaseOrders)
+        .set({
+            totalAmount: totalAmount
+        })
+        .where({
+            ID: POID
+        });
 });
 
 });
